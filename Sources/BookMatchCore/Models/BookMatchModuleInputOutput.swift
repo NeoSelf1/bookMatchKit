@@ -1,6 +1,14 @@
 public struct BookMatchModuleInput {
     public let question: String
     public let ownedBooks: [OwnedBook]
+    
+    public init(
+        question: String,
+        ownedBooks: [OwnedBook]
+    ) {
+        self.question = question
+        self.ownedBooks = ownedBooks
+    }
 }
 
 public struct BookMatchModuleOutput {
