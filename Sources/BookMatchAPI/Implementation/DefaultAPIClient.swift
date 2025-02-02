@@ -29,10 +29,6 @@ public final class DefaultAPIClient: APIClientProtocol {
         
         let (data, response) = try await session.data(for: request)
         
-        guard let httpResponse = response as? HTTPURLResponse else {
-            throw BookMatchError.invalidResponse
-        }
-        
         let naverResponse = try JSONDecoder().decode(NaverBooksResponse.self, from: data)
         return naverResponse.items.map { $0.toBookItem() }
     }
@@ -71,7 +67,8 @@ public final class DefaultAPIClient: APIClientProtocol {
             }
         }
         
-        throw BookMatchError.noMatchFound
+        /// 3회 재시도하여도 sendChatRequest로부터 에러를 계속 반환받거나, GPT로부터 반환받은 결과가 형식에 맞지 않을 경우 invalidResponse를 반환합니다.
+        throw BookMatchError.invalidResponse
     }
     
     public func getAdditionalBook(
@@ -94,7 +91,7 @@ public final class DefaultAPIClient: APIClientProtocol {
                 let response = try await sendChatRequest(messages: messages, temperature: 0.01, maxTokens: 100)
                 
                 guard let result = response.choices.first?.message.content,
-                      result.map({String($0)}).filter({$0=="-"}).count>=2 else {
+                      result.map({String($0)}).contains("-") else {
                     throw BookMatchError.invalidResponse
                 }
                 
@@ -110,7 +107,8 @@ public final class DefaultAPIClient: APIClientProtocol {
             }
         }
         
-        throw BookMatchError.noMatchFound
+        /// 3회 재시도하여도 sendChatRequest로부터 에러를 계속 반환받거나, GPT로부터 반환받은 결과가 형식에 맞지 않을 경우 invalidResponse를 반환합니다.
+        throw BookMatchError.invalidResponse
     }
     
     public func getDescription(
@@ -130,7 +128,7 @@ public final class DefaultAPIClient: APIClientProtocol {
         
         while retryCount < maxRetries {
             do {
-                let response = try await sendChatRequest(messages: messages, temperature: 1.0, maxTokens: 800)
+                let response = try await sendChatRequest(model:"gpt-4o-mini", messages: messages, temperature: 1.0, maxTokens: 500)
                 
                 guard let result = response.choices.first?.message.content else {
                     throw BookMatchError.invalidResponse
@@ -144,11 +142,13 @@ public final class DefaultAPIClient: APIClientProtocol {
             }
         }
         
+        /// 3회 재시도하여도 sendChatRequest로부터 에러를 계속 반환받거나, GPT로부터 반환받은 결과가 형식에 맞지 않을 경우 invalidResponse를 반환합니다.
         throw BookMatchError.invalidResponse
     }
     
     
     private func sendChatRequest(
+        model: String = "gpt-4o",
         messages: [ChatMessage],
         temperature: Double,
         maxTokens: Int
@@ -158,7 +158,7 @@ public final class DefaultAPIClient: APIClientProtocol {
         }
         
         let requestBody: [String: Any] = [
-            "model": "gpt-4",
+            "model": model,
             "messages": messages.map { ["role": $0.role, "content": $0.content] },
             "temperature": temperature,
             "max_tokens": maxTokens
@@ -171,10 +171,6 @@ public final class DefaultAPIClient: APIClientProtocol {
         request.httpBody = try JSONSerialization.data(withJSONObject: requestBody)
         
         let (data, response) = try await session.data(for: request)
-        
-        guard let httpResponse = response as? HTTPURLResponse else {
-            throw BookMatchError.invalidResponse
-        }
         
         return try JSONDecoder().decode(ChatGPTResponse.self, from: data)
     }

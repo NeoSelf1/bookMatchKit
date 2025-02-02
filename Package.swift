@@ -50,5 +50,14 @@ let package = Package(
                     "BookMatchStrategy"
                 ]
             ),
+            
+            .testTarget(
+                name: "BookMatchKitTests",
+                dependencies: [
+                    "BookMatchKit",
+                    "BookMatchCore",
+                    "BookMatchAPI"
+                ]
+            )
         ]
 )

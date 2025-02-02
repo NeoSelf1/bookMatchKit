@@ -2,6 +2,7 @@ import BookMatchCore
 import BookMatchAPI
 import BookMatchStrategy
 
+import CoreFoundation
 public final class BookMatchModule: BookMatchable {
     private let apiClient: APIClientProtocol
     private let titleStrategy: SimilarityCalculatable
@@ -26,28 +27,26 @@ public final class BookMatchModule: BookMatchable {
         guard input.question.count >= 4 else {
             throw BookMatchError.questionShort
         }
-        
-        let recommendation = try await apiClient.getBookRecommendation(
-            question: input.question,
-            ownedBooks: input.ownedBooks
-        )
-        
-        var validNewBooks = [BookItem]()
-        var previousBooks = recommendation.newBooks
-        
-        for book in recommendation.newBooks {
-            var retryCount = 0
-            var currentBook = book
-            var candidates = [(BookItem, Double)]()
+        do {
+            let recommendation = try await apiClient.getBookRecommendation(
+                question: input.question,
+                ownedBooks: input.ownedBooks
+            )
             
-            do {
+            var validNewBooks = [BookItem]()
+            var previousBooks = recommendation.newBooks
+            
+            for book in recommendation.newBooks {
+                var retryCount = 0
+                var currentBook = book
+                var candidates = [(BookItem, Double)]()
+                
                 while retryCount <= configuration.maxRetries {
                     if retryCount == configuration.maxRetries {
                         candidates.sort(by: { $0.1 > $1.1 })
                         if let bestCandidate = candidates.first {
                             validNewBooks.append(bestCandidate.0)
                         }
-                        
                         break
                     }
                     
@@ -56,7 +55,6 @@ public final class BookMatchModule: BookMatchable {
                     
                     if isMatching, let matchedBook {
                         validNewBooks.append(matchedBook)
-                        
                         break
                     } else if !isMatching, let matchedBook {
                         candidates.append((matchedBook, similarity))
@@ -69,25 +67,36 @@ public final class BookMatchModule: BookMatchable {
                         retryCount += 1
                     }
                 }
-            } catch {
-                print("Error during book matching: \(error)")
-                continue
+            }
+            
+            let ownedRaws = recommendation.ownedBooks.map { RawBook(title: $0.title, author: $0.author) }
+            let validNewRaws = validNewBooks.map { RawBook(title: $0.title, author: $0.author) }
+            
+            let description = try await apiClient.getDescription(
+                question: input.question,
+                books: ownedRaws + validNewRaws
+            )
+            
+            return BookMatchModuleOutput(
+                ownedISBNs: input.ownedBooks.map { $0.id },
+                newBooks: Array(Set(validNewBooks)),
+                description: description
+            )
+        } catch {
+            if let bookMatchError = error as? BookMatchError {
+                return BookMatchModuleOutput(
+                    ownedISBNs: [],
+                    newBooks: [],
+                    description: bookMatchError.description
+                )
+            } else {
+                return BookMatchModuleOutput(
+                    ownedISBNs: [],
+                    newBooks: [],
+                    description: error.localizedDescription
+                )
             }
         }
-        
-        let ownedRaws = recommendation.ownedBooks.map { RawBook(title: $0.title, author: $0.author) }
-        let validNewRaws = validNewBooks.map { RawBook(title: $0.title, author: $0.author) }
-        
-        let description = try await apiClient.getDescription(
-            question: input.question,
-            books: ownedRaws + validNewRaws
-        )
-        
-        return BookMatchModuleOutput(
-            ownedISBNs: input.ownedBooks.map { $0.id },
-            newBooks: Array(Set(validNewBooks)),
-            description: description
-        )
     }
     
     public func processBookMatch(_ input: RawBook) async throws -> (isMatching: Bool, book: BookItem?, similarity: Double) {
@@ -115,7 +124,8 @@ public final class BookMatchModule: BookMatchable {
         }
         
         let totalSimilarity = weightedTotalScore(bestMatch.1)
-        let isMatching = bestMatch.1[0] >= configuration.similarityThreshold && bestMatch.1[1] > 0.4
+        let isMatching = bestMatch.1[0] >= configuration.titleSimilarityThreshold && bestMatch.1[1] >= configuration.authorSimilarityThreshold
+
         
         return (
             isMatching: isMatching,
