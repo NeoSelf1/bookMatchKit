@@ -1,15 +1,14 @@
 public enum BookMatchError: Error {
-    case invalidInput
+    case questionShort
     case noMatchFound
     case networkError(String)
     case invalidResponse
     case rateLimitExceeded
-    case unauthorized
     
     public var description: String {
         switch self {
-        case .invalidInput:
-            return "Invalid input provided"
+        case .questionShort:
+            return "질문은 최소 5글자 이상으로 해주세요"
         case .noMatchFound:
             return "No matching book found"
         case .networkError(let message):
@@ -18,8 +17,6 @@ public enum BookMatchError: Error {
             return "Invalid response received"
         case .rateLimitExceeded:
             return "API rate limit exceeded"
-        case .unauthorized:
-            return "Unauthorized access"
         }
     }
 }

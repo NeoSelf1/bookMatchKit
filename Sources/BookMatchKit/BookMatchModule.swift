@@ -23,6 +23,10 @@ public final class BookMatchModule: BookMatchable {
     // MARK: - Public Methods
     
     public func processBookRecommendation(_ input: BookMatchModuleInput) async throws -> BookMatchModuleOutput {
+        guard input.question.count >= 4 else {
+            throw BookMatchError.questionShort
+        }
+        
         let recommendation = try await apiClient.getBookRecommendation(
             question: input.question,
             ownedBooks: input.ownedBooks
@@ -103,14 +107,14 @@ public final class BookMatchModule: BookMatchable {
         }
         
         let sortedResults = results.sorted {
-            weightedScore($0.1) > weightedScore($1.1)
+            weightedTotalScore($0.1) > weightedTotalScore($1.1)
         }
         
         guard let bestMatch = sortedResults.first else {
             return (isMatching: false, book: nil, similarity: 0.0)
         }
         
-        let totalSimilarity = weightedScore(bestMatch.1)
+        let totalSimilarity = weightedTotalScore(bestMatch.1)
         let isMatching = bestMatch.1[0] >= configuration.similarityThreshold && bestMatch.1[1] > 0.4
         
         return (
@@ -123,14 +127,12 @@ public final class BookMatchModule: BookMatchable {
     // MARK: - Private Methods
     
     private func searchOverallBooks(from sourceBook: RawBook) async throws -> [BookItem] {
-        let client = apiClient
-        let title = sourceBook.title
-        let author = sourceBook.author
-        async let searchByTitle = client.searchBooks(query: title, limit: 10)
-        async let searchByAuthor = client.searchBooks(query: author, limit: 10)
+        // MARK: async let 사용 시 self를 통한 apiClient 접근이 여러 동시 태스크에서 데이터 무결성을 보장하지 않을 수 있음
+        try await Task.sleep(nanoseconds: 500_000_000) // 속도 제한 초과 에러 방지
+        let titleResults = try await apiClient.searchBooks(query: sourceBook.title, limit: 10)
+        let authorResults = try await apiClient.searchBooks(query: sourceBook.author, limit: 10)
         
         var searchedResults = [BookItem]()
-        let (titleResults, authorResults) = try await (searchByTitle, searchByAuthor)
         
         searchedResults.append(contentsOf: titleResults)
         searchedResults.append(contentsOf: authorResults)
@@ -146,11 +148,10 @@ public final class BookMatchModule: BookMatchable {
             }
         }
         
-        try await Task.sleep(nanoseconds: 500_000_000) // 0.5초 딜레이
         return searchedResults
     }
     
-    private func weightedScore(_ similarities: [Double]) -> Double {
+    private func weightedTotalScore(_ similarities: [Double]) -> Double {
         let weights = [0.8, 0.2] // 제목 가중치 0.8, 저자 가중치 0.2
         return zip(similarities, weights)
             .map { $0.0 * $0.1 }

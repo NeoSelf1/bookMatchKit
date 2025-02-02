@@ -71,7 +71,7 @@ public final class DefaultAPIClient: APIClientProtocol {
             }
         }
         
-        throw BookMatchError.invalidResponse
+        throw BookMatchError.noMatchFound
     }
     
     public func getAdditionalBook(
@@ -110,7 +110,7 @@ public final class DefaultAPIClient: APIClientProtocol {
             }
         }
         
-        throw BookMatchError.invalidResponse
+        throw BookMatchError.noMatchFound
     }
     
     public func getDescription(

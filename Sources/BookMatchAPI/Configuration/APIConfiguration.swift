@@ -5,14 +5,6 @@ public struct APIConfiguration {
     public let naverBaseURL: String
     public let openAIBaseURL: String
     
-    public static let `default` = APIConfiguration(
-        naverClientId: "",
-        naverClientSecret: "",
-        openAIApiKey: "",
-        naverBaseURL: "https://openapi.naver.com/v1/search/book.json",
-        openAIBaseURL: "https://api.openai.com/v1/chat/completions"
-    )
-    
     public init(
         naverClientId: String,
         naverClientSecret: String,
