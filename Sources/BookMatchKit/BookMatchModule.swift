@@ -23,11 +23,12 @@ public final class BookMatchModule: BookMatchable {
     
     // MARK: - Public Methods
     
-    public func processBookRecommendation(_ input: BookMatchModuleInput) async throws -> BookMatchModuleOutput {
-        guard input.question.count >= 4 else {
-            throw BookMatchError.questionShort
-        }
+    public func processBookRecommendation(_ input: BookMatchModuleInput) async -> BookMatchModuleOutput {
         do {
+            guard input.question.count >= 4 else {
+                throw BookMatchError.questionShort
+            }
+            
             let recommendation = try await apiClient.getBookRecommendation(
                 question: input.question,
                 ownedBooks: input.ownedBooks
