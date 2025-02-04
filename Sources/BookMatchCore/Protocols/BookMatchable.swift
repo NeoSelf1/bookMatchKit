@@ -1,4 +1,7 @@
+import UIKit
+
 public protocol BookMatchable {
-    func processBookRecommendation(_ input: BookMatchModuleInput) async throws -> BookMatchModuleOutput
-    func processBookMatch(_ input: RawBook) async throws -> (isMatching: Bool, book: BookItem?, similarity: Double)
+    func recommendBooks(from ownedBooks: [OwnedBook]) async -> [BookItem]
+    func recommendBooks(for input: BookMatchModuleInput) async -> BookMatchModuleOutput
+    func matchBook(_ rawData: [[String]], image: UIImage) async -> BookItem?
 }
